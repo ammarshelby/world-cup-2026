@@ -401,6 +401,8 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
 .calbtn:active{transform:scale(.99)}
 .tl-loading{display:flex;align-items:center;gap:9px;justify-content:center;color:var(--muted);font-size:12px;font-weight:600;padding:14px}
 .tl-loading .sp{animation:spin 1s linear infinite;display:inline-block}
+.flag{display:inline-block;height:1em;width:auto;border-radius:2px;vertical-align:-0.14em;
+  box-shadow:0 0 0 1px rgba(255,255,255,.1);background:rgba(255,255,255,.05)}
 </style>
 </head>
 <body>
@@ -462,6 +464,21 @@ const FLAG = {
   "Argentina":"🇦🇷","Austria":"🇦🇹","Algeria":"🇩🇿","Jordan":"🇯🇴",
   "Colombia":"🇨🇴","Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿",
   "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦"
+};
+// ISO codes for image flags (renders on Windows too, unlike emoji flags)
+const ISO = {
+  "Mexico":"mx","South Africa":"za","South Korea":"kr","Czechia":"cz",
+  "Canada":"ca","Switzerland":"ch","Bosnia and Herzegovina":"ba","Qatar":"qa",
+  "Brazil":"br","Morocco":"ma","Scotland":"gb-sct","Haiti":"ht",
+  "United States":"us","Australia":"au","Paraguay":"py","Türkiye":"tr",
+  "Germany":"de","Ivory Coast":"ci","Ecuador":"ec","Curaçao":"cw",
+  "Netherlands":"nl","Japan":"jp","Sweden":"se","Tunisia":"tn",
+  "Belgium":"be","Egypt":"eg","Iran":"ir","New Zealand":"nz",
+  "Spain":"es","Cape Verde":"cv","Uruguay":"uy","Saudi Arabia":"sa",
+  "France":"fr","Norway":"no","Senegal":"sn","Iraq":"iq",
+  "Argentina":"ar","Austria":"at","Algeria":"dz","Jordan":"jo",
+  "Colombia":"co","Portugal":"pt","DR Congo":"cd","Uzbekistan":"uz",
+  "England":"gb-eng","Croatia":"hr","Ghana":"gh","Panama":"pa"
 };
 const SHORT = {"Bosnia and Herzegovina":"Bosnia","United States":"USA","South Africa":"S. Africa",
   "South Korea":"S. Korea","Saudi Arabia":"Saudi Arabia","Czechia":"Czechia","New Zealand":"N. Zealand",
@@ -653,7 +670,7 @@ const BOOT_ONES=[
    ===================================================================== */
 const $=s=>document.querySelector(s);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
-const fl=n=>FLAG[n]||"🏳️";
+const fl=n=>{const c=ISO[n];return c?`<img class="flag" src="https://flagcdn.com/${c}.svg" alt="" onerror="this.replaceWith(document.createTextNode('\u{1F3F3}'))">`:"\u{1F3F3}";};
 const short=n=>SHORT[n]||n;
 const now=()=>new Date();
 const dtf=(ts,opt)=>new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Riyadh',...opt}).format(new Date(ts));
