@@ -412,6 +412,28 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
 .pushrow.ok b{color:var(--green)}
 .pushrow.warn{background:rgba(255,200,71,.08);border-color:rgba(255,200,71,.26);color:#F2E4C2}
 .pushrow.warn b{color:var(--gold)}
+
+/* ---------- Language toggle + RTL (Arabic) ---------- */
+.langbtn{font-family:'Manrope',system-ui,sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.02em;min-width:34px}
+@media (max-width:479px){.appbar-right{gap:7px} .stagepill{display:none}}
+html[dir=rtl] body{direction:rtl}
+/* Arabic legibility: Anton is Latin-only, so drop uppercasing/tracking for Arabic text */
+html[dir=rtl] .wm,html[dir=rtl] .nm,html[dir=rtl] .spot-team .nm,html[dir=rtl] .sect h2,
+html[dir=rtl] .brk-lab,html[dir=rtl] .tier-h .t,html[dir=rtl] .fav-h,html[dir=rtl] .grp-h h3,
+html[dir=rtl] .sh-t .nm,html[dir=rtl] .sh-stage,html[dir=rtl] .spot-vs,html[dir=rtl] .sh-mid .up{
+  font-family:'Manrope',system-ui,sans-serif;text-transform:none;letter-spacing:0}
+html[dir=rtl] .eyebrow,html[dir=rtl] .sub,html[dir=rtl] .spotlabel,html[dir=rtl] .tab,
+html[dir=rtl] .chip,html[dir=rtl] .m-view,html[dir=rtl] .stagepill,html[dir=rtl] .grp-legend,
+html[dir=rtl] .lab,html[dir=rtl] .pv .k,html[dir=rtl] .tl-h h3,html[dir=rtl] .m-meta,
+html[dir=rtl] .brk-intro,html[dir=rtl] .foot,html[dir=rtl] .gb-hero .meta,html[dir=rtl] .out{
+  text-transform:none;letter-spacing:0}
+/* keep the horizontal bracket flowing left-to-right even in RTL for readability */
+html[dir=rtl] .brk-scroll{direction:ltr}
+html[dir=rtl] .brk-scroll .brk-lab,html[dir=rtl] .brk-scroll .bx-row .nm{text-align:right}
+/* scores / numeric rows stay LTR so digits read correctly */
+html[dir=rtl] .m-score,html[dir=rtl] .livescore,html[dir=rtl] .sh-mid .big,html[dir=rtl] .cd,
+html[dir=rtl] .tbl td,html[dir=rtl] .tbl th{direction:ltr}
+html[dir=rtl] .tbl th.tl2,html[dir=rtl] .tbl td.tm{text-align:right}
 </style>
 </head>
 <body>
@@ -421,13 +443,14 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
     <div class="brand">
       <div class="glyph">🏆</div>
       <div>
-        <div class="wm">WORLD CUP <b>26</b></div>
-        <div class="sub">USA · Canada · Mexico</div>
+        <div class="wm" id="brandWm">WORLD CUP <b>26</b></div>
+        <div class="sub" id="brandSub">USA · Canada · Mexico</div>
       </div>
     </div>
     <div class="appbar-right">
       <button class="pinbtn" id="bellBtn" aria-label="Goal alerts">🔔</button>
       <button class="pinbtn" id="pinBtn" aria-label="Pin your team">☆</button>
+      <button class="pinbtn langbtn" id="langBtn" aria-label="Language">ع</button>
       <div class="stagepill"><span class="dot"></span><span id="statusPill">Quarter-Finals</span></div>
     </div>
   </div>
@@ -442,15 +465,15 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
   <section class="hero" id="hero"></section>
 
   <nav class="tabs" id="tabs">
-    <button class="tab on" data-tab="matches"><span class="ti">⚽</span>Matches</button>
-    <button class="tab" data-tab="bracket"><span class="ti">🏆</span>Bracket</button>
-    <button class="tab" data-tab="groups"><span class="ti">📊</span>Groups</button>
-    <button class="tab" data-tab="scorers"><span class="ti">👟</span>Scorers</button>
+    <button class="tab on" data-tab="matches"><span class="ti">⚽</span><span class="tl">Matches</span></button>
+    <button class="tab" data-tab="bracket"><span class="ti">🏆</span><span class="tl">Bracket</span></button>
+    <button class="tab" data-tab="groups"><span class="ti">📊</span><span class="tl">Groups</span></button>
+    <button class="tab" data-tab="scorers"><span class="ti">👟</span><span class="tl">Scorers</span></button>
   </nav>
 
   <main id="main"></main>
 
-  <div class="foot">
+  <div class="foot" id="footNote">
     <b>World Cup 2026 Tracker.</b> Snapshot current as of 8 July 2026 — complete through the Round of 16, with the quarter-finals, semi-finals, third-place play-off and final still to come. All kickoff times are shown in Saudi Arabia time (AST · UTC+3). Scores and goalscorers verified from match reports.<br>
     Shirt numbers are shown for players whose national-team number is well established; goal-by-goal minute timelines are included wherever match data confirmed them, and a summary is shown otherwise.
   </div>
@@ -679,12 +702,169 @@ const BOOT_ONES=[
 /* =====================================================================
    HELPERS
    ===================================================================== */
+/* =====================================================================
+   i18n — English / Arabic with RTL
+   ===================================================================== */
+let LANG='en';
+try{ LANG=localStorage.getItem('wc26_lang') || ((navigator.language||'').toLowerCase().startsWith('ar')?'ar':'en'); }catch(e){}
+
+const TEAM_AR={
+  "Mexico":"المكسيك","South Africa":"جنوب أفريقيا","South Korea":"كوريا الجنوبية","Czechia":"التشيك",
+  "Canada":"كندا","Switzerland":"سويسرا","Bosnia and Herzegovina":"البوسنة","Qatar":"قطر",
+  "Brazil":"البرازيل","Morocco":"المغرب","Scotland":"اسكتلندا","Haiti":"هايتي",
+  "United States":"أمريكا","Australia":"أستراليا","Paraguay":"باراغواي","Türkiye":"تركيا",
+  "Germany":"ألمانيا","Ivory Coast":"ساحل العاج","Ecuador":"الإكوادور","Curaçao":"كوراساو",
+  "Netherlands":"هولندا","Japan":"اليابان","Sweden":"السويد","Tunisia":"تونس",
+  "Belgium":"بلجيكا","Egypt":"مصر","Iran":"إيران","New Zealand":"نيوزيلندا",
+  "Spain":"إسبانيا","Cape Verde":"الرأس الأخضر","Uruguay":"أوروغواي","Saudi Arabia":"السعودية",
+  "France":"فرنسا","Norway":"النرويج","Senegal":"السنغال","Iraq":"العراق",
+  "Argentina":"الأرجنتين","Austria":"النمسا","Algeria":"الجزائر","Jordan":"الأردن",
+  "Colombia":"كولومبيا","Portugal":"البرتغال","DR Congo":"الكونغو","Uzbekistan":"أوزبكستان",
+  "England":"إنجلترا","Croatia":"كرواتيا","Ghana":"غانا","Panama":"بنما"
+};
+
+const I18N={
+  en:{
+    title:"World Cup 2026 · Live Tracker",
+    brandWm:"WORLD CUP <b>26</b>", brandSub:"USA · Canada · Mexico",
+    langAria:"Switch to Arabic", bellLabel:"Goal alerts", pinLabel:"Pin your team", pinnedLabel:"Pinned:",
+    tabs:{matches:"Matches",bracket:"Bracket",groups:"Groups",scorers:"Scorers"},
+    checking:"Checking live scores…", retry:"Retry",
+    today:"Today", tomorrow:"Tomorrow", yesterday:"Yesterday",
+    liveNow:"Live Now", nextUp:"Next Up", vs:"VS", live:"LIVE", championsCrowned:"Champions Crowned",
+    days:"days", hrs:"hrs", min:"min", sec:"sec", ast:"AST",
+    resultPending:"Result<br>pending", inProgress:"In progress", liveNowLc:"Live now",
+    onPenalties:"on penalties", aet:"a.e.t.",
+    detailsCal:"Details · add to calendar ›", viewGoals:"View goals & timeline ›", tbd:"TBD",
+    searchTeam:"Search a team…",
+    fAll:"All 104", fRemaining:"Remaining", fFinished:"Finished", fR16:"Round of 16", fR32:"Round of 32", fGroup:"Group Stage",
+    noMatches:"No matches found", forQ:"for",
+    brkIntro:"The single-elimination path from the last 16 to the July 19 final at MetLife Stadium. Tap a completed tie for its goals.",
+    champions1:"Champions · Jul 19", pens:"Pens",
+    thirdNote:"Third-place play-off: <b>Sat 18 Jul</b>, Hard Rock Stadium, Miami — Semi-final losers meet for bronze.",
+    groupsNote:"Final group tables. The top two of each group plus the eight best third-placed sides — <b>32 teams</b> — reached the knockouts (highlighted green).",
+    th:{team:"Team",p:"P",w:"W",d:"D",l:"L",gf:"GF",ga:"GA",gd:"GD",pts:"Pts"},
+    advancedLegend:"Advanced to knockout stage",
+    bootLeader:"adidas Golden Boot · Race Leader", allTimeTop:"all-time World Cup top scorer",
+    goalsWord:"Goals", no:"No.", goalSingular:"Goal", goalPlural:"Goals", eliminated:"Eliminated", goalSelected:"Goal · selected",
+    onesNote:"Many more players have scored once. Tie-breaker for the Golden Boot is assists — Mbappé currently leads that count with two.",
+    loadingTimeline:"Loading full goal timeline…", goalTimeline:"Goal Timeline",
+    penalty:"Penalty", ownGoal:"Own goal", noDetail:"Goal-by-goal detail isn't available for this match.",
+    addCal:"📅 Add to Calendar", kickoff:"Kickoff", date:"Date", stadium:"Stadium", city:"City",
+    pinTitle:"Pin your team", pinSub:"Starred, sorted to the top, one-tap filter — and its goals get a bigger celebration.", unpin:"✕ Unpin",
+    goalAlerts:"Goal Alerts", goalAlertsSub:"Push notifications for live goals",
+    pushUnsupported:"This browser doesn't support notifications.",
+    pushIosA:"On iPhone, alerts only work when the app is opened from your <b>Home Screen icon</b> — not from a Safari tab.",
+    pushIosB:"Close this, open the app from its Home Screen icon, then tap 🔔 again.",
+    pushBlocked:"Notifications are blocked for this app.",
+    pushBlockedFix:"Delete the Home Screen icon, re-add it, then tap 🔔 and choose <b>Allow</b>.",
+    pushOn1:"Alerts are switched on for this device.",
+    pushConnected:"Connected to the alert server — you'll get a buzz when a goal goes in.",
+    pushAlmost:"<b>Almost there.</b> The alert server isn't connected yet (Stage 2). Local test still works.",
+    pushTestBtn:"🔔 Send a test notification", pushOff:"Turn alerts off",
+    pushSell1:"Get a notification the moment a goal goes in — even with the app closed.",
+    pushSell2:"Pinned-team goals get a bigger alert.", pushSell3:"Free, and it won't drain your battery.",
+    pushEnable:"Enable goal alerts", working:"Working…", pushFail:"Couldn't enable",
+    pushFailTip:"On iPhone, make sure you opened the app from its <b>Home Screen icon</b>, and that you re-added it after this update.",
+    testTitle:"⚽ GOAL! — test", testBody:"If you can see this, alerts are working. 🇲🇦 1–0 🇫🇷",
+    goal:"GOAL!",
+    syncOffline:"Live sync unavailable — showing saved results",
+    liveMatches:(n)=>`${n} ${n>1?'matches':'match'} live now · auto-updating`,
+    syncConnected:(tm)=>`Live scores connected · updated ${tm}`,
+    groupWord:"Group",
+    stages:{"Final":"Final","Third-place":"Third-place Play-off","Semi-final":"Semi-finals","Quarter-final":"Quarter-finals","Round of 16":"Round of 16","Round of 32":"Round of 32","Group":"Group Stage"},
+    footNote:"<b>World Cup 2026 Tracker.</b> Snapshot current as of 8 July 2026 — complete through the Round of 16, with the quarter-finals, semi-finals, third-place play-off and final still to come. All kickoff times are shown in Saudi Arabia time (AST · UTC+3). Scores and goalscorers verified from match reports.<br>Shirt numbers are shown for players whose national-team number is well established; goal-by-goal minute timelines are included wherever match data confirmed them, and a summary is shown otherwise."
+  },
+  ar:{
+    title:"كأس العالم 2026 · متابعة مباشرة",
+    brandWm:"كأس العالم <b>26</b>", brandSub:"أمريكا · كندا · المكسيك",
+    langAria:"التبديل إلى الإنجليزية", bellLabel:"تنبيهات الأهداف", pinLabel:"ثبّت منتخبك", pinnedLabel:"مثبّت:",
+    tabs:{matches:"المباريات",bracket:"الأدوار",groups:"المجموعات",scorers:"الهدافون"},
+    checking:"جارِ التحقق من النتائج…", retry:"إعادة",
+    today:"اليوم", tomorrow:"غدًا", yesterday:"أمس",
+    liveNow:"مباشر الآن", nextUp:"التالية", vs:"ضد", live:"مباشر", championsCrowned:"تُوِّج البطل",
+    days:"يوم", hrs:"ساعة", min:"دقيقة", sec:"ثانية", ast:"بتوقيت السعودية",
+    resultPending:"النتيجة<br>قيد الانتظار", inProgress:"جارية", liveNowLc:"مباشر الآن",
+    onPenalties:"بركلات الترجيح", aet:"بعد التمديد",
+    detailsCal:"التفاصيل · أضف إلى التقويم ‹", viewGoals:"الأهداف والمجريات ‹", tbd:"يُحدد",
+    searchTeam:"ابحث عن منتخب…",
+    fAll:"الكل 104", fRemaining:"المتبقية", fFinished:"المنتهية", fR16:"دور الـ16", fR32:"دور الـ32", fGroup:"دور المجموعات",
+    noMatches:"لا توجد مباريات مطابقة", forQ:"لـ",
+    brkIntro:"طريق الإقصاء المباشر من دور الـ16 حتى نهائي 19 يوليو على ملعب MetLife. اضغط على مباراة منتهية لعرض أهدافها.",
+    champions1:"البطل · 19 يوليو", pens:"ترجيح",
+    thirdNote:"مباراة تحديد المركز الثالث: <b>السبت 18 يوليو</b>، ملعب Hard Rock، ميامي — يلتقي الخاسران من نصف النهائي على البرونزية.",
+    groupsNote:"جداول المجموعات النهائية. تأهّل أول منتخبين من كل مجموعة إضافةً إلى أفضل ثمانية في المركز الثالث — <b>32 منتخبًا</b> — إلى الأدوار الإقصائية (مظللة بالأخضر).",
+    th:{team:"المنتخب",p:"لعب",w:"فوز",d:"تعادل",l:"خسارة",gf:"له",ga:"عليه",gd:"فارق",pts:"نقاط"},
+    advancedLegend:"المتأهلون إلى الأدوار الإقصائية",
+    bootLeader:"الحذاء الذهبي أديداس · المتصدر", allTimeTop:"الهداف التاريخي لكأس العالم",
+    goalsWord:"أهداف", no:"رقم", goalSingular:"هدف", goalPlural:"أهداف", eliminated:"خارج المنافسة", goalSelected:"هدف · مختارات",
+    onesNote:"سجّل كثير من اللاعبين هدفًا واحدًا. معيار الترجيح للحذاء الذهبي هو التمريرات الحاسمة — يتصدّر مبابي حاليًا بهدفين تمريريّين.",
+    loadingTimeline:"جارِ تحميل مجريات الأهداف…", goalTimeline:"مجريات الأهداف",
+    penalty:"ركلة جزاء", ownGoal:"هدف في مرماه", noDetail:"تفاصيل الأهداف غير متوفرة لهذه المباراة.",
+    addCal:"📅 أضف إلى التقويم", kickoff:"الانطلاق", date:"التاريخ", stadium:"الملعب", city:"المدينة",
+    pinTitle:"ثبّت منتخبك", pinSub:"يُميَّز بنجمة ويُرتَّب في الأعلى، وفلتر بلمسة واحدة — وأهدافه تحصل على احتفال أكبر.", unpin:"✕ إلغاء التثبيت",
+    goalAlerts:"تنبيهات الأهداف", goalAlertsSub:"إشعارات فورية للأهداف المباشرة",
+    pushUnsupported:"هذا المتصفح لا يدعم الإشعارات.",
+    pushIosA:"على الآيفون، تعمل التنبيهات فقط عند فتح التطبيق من <b>أيقونة الشاشة الرئيسية</b> — وليس من تبويب Safari.",
+    pushIosB:"أغلق هذه النافذة، افتح التطبيق من أيقونته على الشاشة الرئيسية، ثم اضغط 🔔 مجددًا.",
+    pushBlocked:"الإشعارات محظورة لهذا التطبيق.",
+    pushBlockedFix:"احذف الأيقونة من الشاشة الرئيسية، أعد إضافتها، ثم اضغط 🔔 واختر <b>السماح</b>.",
+    pushOn1:"التنبيهات مُفعّلة على هذا الجهاز.",
+    pushConnected:"متصل بخادم التنبيهات — ستصلك رنّة فور تسجيل أي هدف.",
+    pushAlmost:"<b>اقتربنا.</b> خادم التنبيهات غير متصل بعد (المرحلة 2). الاختبار المحلي يعمل.",
+    pushTestBtn:"🔔 أرسل إشعارًا تجريبيًا", pushOff:"إيقاف التنبيهات",
+    pushSell1:"احصل على إشعار لحظة تسجيل أي هدف — حتى والتطبيق مغلق.",
+    pushSell2:"أهداف منتخبك المثبّت تحصل على تنبيه أكبر.", pushSell3:"مجاني، ولن يستنزف بطاريتك.",
+    pushEnable:"تفعيل تنبيهات الأهداف", working:"جارٍ…", pushFail:"تعذّر التفعيل",
+    pushFailTip:"على الآيفون، تأكد أنك فتحت التطبيق من <b>أيقونة الشاشة الرئيسية</b>، وأنك أعدت إضافته بعد هذا التحديث.",
+    testTitle:"⚽ هدف! — تجربة", testBody:"إذا رأيت هذا فالتنبيهات تعمل. 🇲🇦 1–0 🇫🇷",
+    goal:"هدف!",
+    syncOffline:"المزامنة المباشرة غير متاحة — عرض النتائج المحفوظة",
+    liveMatches:(n)=>`${n} مباراة مباشرة الآن · تحديث تلقائي`,
+    syncConnected:(tm)=>`النتائج المباشرة متصلة · آخر تحديث ${tm}`,
+    groupWord:"المجموعة",
+    stages:{"Final":"النهائي","Third-place":"تحديد المركز الثالث","Semi-final":"نصف النهائي","Quarter-final":"ربع النهائي","Round of 16":"دور الـ16","Round of 32":"دور الـ32","Group":"دور المجموعات"},
+    footNote:"<b>متابعة كأس العالم 2026.</b> لقطة محدّثة حتى 8 يوليو 2026 — مكتملة حتى دور الـ16، مع بقاء ربع النهائي ونصف النهائي وتحديد المركز الثالث والنهائي. جميع المواعيد بتوقيت السعودية (UTC+3). النتائج والهدافون موثّقون من تقارير المباريات.<br>تُعرض أرقام القمصان للاعبين المعروفين بأرقامهم مع منتخباتهم؛ وتُدرج مجريات الأهداف دقيقةً بدقيقة حين تتوفر بياناتها، وإلا فيُعرض ملخّص."
+  }
+};
+
+const L=()=>I18N[LANG];
+function t(k,a){ const v=I18N[LANG][k]; return typeof v==="function"?v(a):v; }
+function stageName(s){ return (L().stages&&L().stages[s])||s; }
+function groupLabel(x){ return t('groupWord')+" "+x; }
+function setStatusPill(){
+  const up=M.filter(m=>m.status==="UP").sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const next=up.find(m=>new Date(m.ts)>now())||up[0];
+  const p=$("#statusPill"); if(next&&p)p.textContent=stageName(next.stage);
+}
+function applyLang(initial){
+  const d=document.documentElement; d.lang=LANG; d.dir=LANG==='ar'?'rtl':'ltr';
+  const L2=L();
+  document.title=L2.title;
+  const bw=$("#brandWm"); if(bw)bw.innerHTML=L2.brandWm;
+  const bs=$("#brandSub"); if(bs)bs.textContent=L2.brandSub;
+  const lb=$("#langBtn"); if(lb){ lb.textContent=LANG==='ar'?'EN':'ع'; lb.setAttribute('aria-label',L2.langAria); }
+  const be=$("#bellBtn"); if(be)be.setAttribute('aria-label',L2.bellLabel);
+  const tabs=$("#tabs"); if(tabs)tabs.querySelectorAll(".tab").forEach(tb=>{ const s=tb.querySelector('.tl'); if(s)s.textContent=L2.tabs[tb.dataset.tab]; });
+  const rb=$("#sbRetry"); if(rb)rb.textContent=L2.retry;
+  const fn=$("#footNote"); if(fn)fn.innerHTML=L2.footNote;
+  setStatusPill();
+  renderPinBtn(); renderHero();
+  render(!initial);
+  if(!initial){
+    const sb=$("#syncbar"), st=$("#syncText");
+    if(sb&&st){ sb.className="syncbar checking"; st.textContent=L2.checking; const ico=sb.querySelector('.sb-ico'); if(ico)ico.textContent='◌'; }
+    if(window.__wcSync)window.__wcSync();
+  }
+}
+function setLang(l){ LANG=l; try{localStorage.setItem('wc26_lang',l);}catch(e){} applyLang(false); }
+
 const $=s=>document.querySelector(s);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 const fl=n=>{const c=ISO[n];return c?`<img class="flag" src="https://flagcdn.com/${c}.svg" alt="" onerror="this.replaceWith(document.createTextNode('\u{1F3F3}'))">`:"\u{1F3F3}";};
-const short=n=>SHORT[n]||n;
+const short=n=>LANG==='ar'?(TEAM_AR[n]||SHORT[n]||n):(SHORT[n]||n);
 const now=()=>new Date();
-const dtf=(ts,opt)=>new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Riyadh',...opt}).format(new Date(ts));
+const dtf=(ts,opt)=>new Intl.DateTimeFormat(LANG==='ar'?'ar-u-nu-latn':'en-US',{timeZone:'Asia/Riyadh',...opt}).format(new Date(ts));
 function fmtDate(ts){return dtf(ts,{weekday:'short',day:'numeric',month:'short'});}
 function fmtTime(ts){return dtf(ts,{hour:'numeric',minute:'2-digit'});}
 function relDay(ts){
@@ -692,7 +872,7 @@ function relDay(ts){
   const dd=new Date(dtf(ts,{year:'numeric',month:'2-digit',day:'2-digit'}));
   const nn=new Date(dtf(n.toISOString(),{year:'numeric',month:'2-digit',day:'2-digit'}));
   const diff=Math.round((dd-nn)/86400000);
-  if(diff===0)return"Today"; if(diff===1)return"Tomorrow"; if(diff===-1)return"Yesterday";
+  if(diff===0)return t('today'); if(diff===1)return t('tomorrow'); if(diff===-1)return t('yesterday');
   return fmtDate(ts);
 }
 const STAGE_ORDER=["Final","Third-place","Semi-final","Quarter-final","Round of 16","Round of 32","Group"];
@@ -708,14 +888,14 @@ function renderHero(){
   const up=M.filter(m=>m.status==="UP").sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const next=liveM[0]||up.find(m=>new Date(m.ts)>now())||up[0];
   const hero=$("#hero");
-  if(!next){hero.innerHTML=`<div class="hero-glow"></div><div class="hero-in"><div class="trophy">🏆</div><div style="text-align:center;font-family:'Anton';font-size:24px">Champions Crowned</div></div>`;return;}
+  if(!next){hero.innerHTML=`<div class="hero-glow"></div><div class="hero-in"><div class="trophy">🏆</div><div style="text-align:center;font-family:'Anton';font-size:24px">${t('championsCrowned')}</div></div>`;return;}
   const isLive=next.status==="LIVE";
   const hn=next.home||next.homeTxt, an=next.away||next.awayTxt;
   const others=up.filter(m=>m!==next).slice(0,4);
   hero.innerHTML=`
     <div class="hero-glow ${isLive?'live':''}"></div>
     <div class="hero-in">
-      <span class="eyebrow ${isLive?'liveeye':''}">${isLive?`<span class="livedot"></span>Live Now · ${STAGE_PLURAL[next.stage]}`:`<span class="l"></span>Next Up · ${STAGE_PLURAL[next.stage]}`}</span>
+      <span class="eyebrow ${isLive?'liveeye':''}">${isLive?`<span class="livedot"></span>${t('liveNow')} · ${stageName(next.stage)}`:`<span class="l"></span>${t('nextUp')} · ${stageName(next.stage)}`}</span>
       <div class="spot">
         <div class="spot-team">
           <div class="fl">${next.home?fl(next.home):"⚔️"}</div>
@@ -723,20 +903,20 @@ function renderHero(){
         </div>
         <div class="spot-mid">
           ${isLive
-            ?`<div class="livescore">${next.hs} <span class="d">–</span> ${next.as}</div><div class="liveclock"><span class="livedot"></span>${next.clock||"LIVE"}</div>`
-            :`<div class="spot-vs">VS</div><div class="cd" id="cd"></div>`}
+            ?`<div class="livescore">${next.hs} <span class="d">–</span> ${next.as}</div><div class="liveclock"><span class="livedot"></span>${next.clock||t('live')}</div>`
+            :`<div class="spot-vs">${t('vs')}</div><div class="cd" id="cd"></div>`}
         </div>
         <div class="spot-team">
           <div class="fl">${next.away?fl(next.away):"⚔️"}</div>
           <div class="nm">${next.away?short(next.away):an}</div>
         </div>
       </div>
-      <div class="spot-meta">${isLive?`<b>${next.venue}, ${next.city}</b>`:`<b>${fmtDate(next.ts)}, ${fmtTime(next.ts)} AST</b> · ${next.venue}, ${next.city}`}</div>
+      <div class="spot-meta">${isLive?`<b>${next.venue}, ${next.city}</b>`:`<b>${fmtDate(next.ts)}, ${fmtTime(next.ts)} ${t('ast')}</b> · ${next.venue}, ${next.city}`}</div>
       ${others.length?`<div class="hero-strip">${others.map(m=>{
-        return `<div class="mini"><div class="mt">${STAGE_PLURAL[m.stage]}</div>
+        return `<div class="mini"><div class="mt">${stageName(m.stage)}</div>
           <div class="mm">${m.home?`<span>${fl(m.home)}</span>${short(m.home)}`:m.homeTxt}</div>
           <div class="mm">${m.away?`<span>${fl(m.away)}</span>${short(m.away)}`:m.awayTxt}</div>
-          <div class="md">${relDay(m.ts)} · ${fmtTime(m.ts)} AST</div></div>`;
+          <div class="md">${relDay(m.ts)} · ${fmtTime(m.ts)} ${t('ast')}</div></div>`;
       }).join("")}</div>`:""}
     </div>`;
   if(!isLive) startCountdown(next.ts);
@@ -746,13 +926,13 @@ function startCountdown(ts){
   const cd=$("#cd"); if(!cd)return;
   const tick=()=>{
     let diff=Math.max(0,new Date(ts)-now());
-    if(diff<=0){cd.innerHTML=`<div class="u" style="min-width:auto;padding:6px 12px"><div class="n" style="color:var(--green)">LIVE?</div></div>`;clearInterval(cdTimer);return;}
+    if(diff<=0){cd.innerHTML=`<div class="u" style="min-width:auto;padding:6px 12px"><div class="n" style="color:var(--green)">${t('live')}?</div></div>`;clearInterval(cdTimer);return;}
     const d=Math.floor(diff/86400000);diff-=d*86400000;
     const h=Math.floor(diff/3600000);diff-=h*3600000;
     const mn=Math.floor(diff/60000);diff-=mn*60000;
     const s=Math.floor(diff/1000);
     const u=(n,l)=>`<div class="u"><div class="n">${String(n).padStart(2,'0')}</div><div class="lb">${l}</div></div>`;
-    cd.innerHTML=(d>0?u(d,'days'):'')+u(h,'hrs')+u(mn,'min')+u(s,'sec');
+    cd.innerHTML=(d>0?u(d,t('days')):'')+u(h,t('hrs'))+u(mn,t('min'))+u(s,t('sec'));
   };
   tick();cdTimer=setInterval(tick,1000);
 }
@@ -771,22 +951,22 @@ function matchCard(m){
   const showScore=done||isLive;
   const pend=m.status==="UP"&&new Date(m.ts)<now();
   const hn=m.home, an=m.away;
-  const hName=hn?short(hn):(m.homeTxt||"TBD"), aName=an?short(an):(m.awayTxt||"TBD");
+  const hName=hn?short(hn):(m.homeTxt||t('tbd')), aName=an?short(an):(m.awayTxt||t('tbd'));
   const hWin=done&&(m.hs>m.as||(m.pen&&m.pen.h>m.pen.a));
   const aWin=done&&(m.as>m.hs||(m.pen&&m.pen.a>m.pen.h));
   let mid;
   if(showScore){
     mid=`<div class="m-score"><span class="sc" style="${hWin?'color:var(--green)':''}">${m.hs}</span><span class="dash">–</span><span class="sc" style="${aWin?'color:var(--green)':''}">${m.as}</span></div>`;
   }else if(pend){
-    mid=`<div class="m-time"><span class="badge pend">Result<br>pending</span></div>`;
+    mid=`<div class="m-time"><span class="badge pend">${t('resultPending')}</span></div>`;
   }else{
-    mid=`<div class="m-time"><span class="t">${fmtTime(m.ts)}</span><span class="z">AST</span></div>`;
+    mid=`<div class="m-time"><span class="t">${fmtTime(m.ts)}</span><span class="z">${t('ast')}</span></div>`;
   }
   const hasDetail=(m.goals&&m.goals.length)||m.note;
   const tappable=(showScore&&hasDetail)||m.status==="UP";
   const card=el("div","match"+(isLive?" live":"")+(isFav(m)?" fav":"")+(tappable?" tap":""));
   card.innerHTML=`
-    ${isLive?`<div class="livebar"><span class="livedot"></span>LIVE · ${m.clock||"In progress"}</div>`:''}
+    ${isLive?`<div class="livebar"><span class="livedot"></span>${t('live')} · ${m.clock||t('inProgress')}</div>`:''}
     <div class="m-top">
       <div class="m-team ${aWin?'lose':''}">
         <span class="fl">${hn?fl(hn):"⚔️"}</span>
@@ -798,14 +978,14 @@ function matchCard(m){
         <span class="nm">${aName}</span>${aWin?'<span class="wtick">▲</span>':''}
       </div>
     </div>
-    ${done&&m.pen?`<div style="text-align:center;margin-top:6px"><span class="badge pens">${m.pen.h}–${m.pen.a} on penalties${m.aet?' · a.e.t.':''}</span></div>`:''}
+    ${done&&m.pen?`<div style="text-align:center;margin-top:6px"><span class="badge pens">${m.pen.h}–${m.pen.a} ${t('onPenalties')}${m.aet?' · '+t('aet'):''}</span></div>`:''}
     ${showScore?scorerChips(m):''}
     <div class="m-meta">
-      ${m.group?`<span class="g">Group ${m.group}</span>`:`<span class="g">${STAGE_PLURAL[m.stage]}</span>`}
+      ${m.group?`<span class="g">${groupLabel(m.group)}</span>`:`<span class="g">${stageName(m.stage)}</span>`}
       <span>📍 ${m.city}</span><span class="sep">·</span>
-      <span>${done?fmtDate(m.ts):isLive?'Live now':relDay(m.ts)+', '+fmtTime(m.ts)+' AST'}</span>
+      <span>${done?fmtDate(m.ts):isLive?t('liveNowLc'):relDay(m.ts)+', '+fmtTime(m.ts)+' '+t('ast')}</span>
     </div>
-    ${tappable?`<div class="m-view">${m.status==="UP"?'Details · add to calendar ›':'View goals & timeline ›'}</div>`:''}`;
+    ${tappable?`<div class="m-view">${m.status==="UP"?t('detailsCal'):t('viewGoals')}</div>`:''}`;
   if(tappable)card.addEventListener("click",()=>openSheet(m));
   return card;
 }
@@ -834,12 +1014,12 @@ function renderMatches(){
   f.innerHTML=`
     <div class="search">
       <span class="ic">🔍</span>
-      <input id="q" type="text" placeholder="Search a team…" value="${state.q.replace(/"/g,'&quot;')}">
+      <input id="q" type="text" placeholder="${t('searchTeam')}" value="${state.q.replace(/"/g,'&quot;')}">
       <span class="clr" id="clr">✕</span>
     </div>
     <div class="chips" id="chips">
       ${FAV?`<button class="chip fav ${state.filter==='myteam'?'on':''}" data-f="myteam">⭐ ${short(FAV)}</button>`:''}
-      ${[["all","All 104"],["remaining","Remaining"],["finished","Finished"],["r16","Round of 16"],["r32","Round of 32"],["group","Group Stage"]]
+      ${[["all",t('fAll')],["remaining",t('fRemaining')],["finished",t('fFinished')],["r16",t('fR16')],["r32",t('fR32')],["group",t('fGroup')]]
         .map(([k,l])=>`<button class="chip ${state.filter===k?'on':''}" data-f="${k}">${l}</button>`).join("")}
     </div>`;
   wrap.appendChild(f);
@@ -869,13 +1049,13 @@ function renderMatches(){
     if(stage==="Group"){
       // group headers A..L
       const upH=el("div","sect "+(list[0].status==="UP"?"up":""));
-      upH.innerHTML=`<span class="tick"></span><h2>Group Stage</h2><span class="cnt">${list.length}</span><span class="rule"></span>`;
+      upH.innerHTML=`<span class="tick"></span><h2>${t('fGroup')}</h2><span class="cnt">${list.length}</span><span class="rule"></span>`;
       wrap.appendChild(upH);
       Object.keys(GROUPS).forEach(letter=>{
         const gm=list.filter(m=>m.group===letter).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
         if(!gm.length)return;
         const gh=el("div"); gh.style.cssText="font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin:14px 0 8px;display:flex;align-items:center;gap:8px";
-        gh.innerHTML=`<span style="width:22px;height:22px;border-radius:6px;background:linear-gradient(145deg,var(--violet),#6547d6);display:grid;place-items:center;font-family:'Anton';color:#fff;font-size:11px">${letter}</span>Group ${letter}`;
+        gh.innerHTML=`<span style="width:22px;height:22px;border-radius:6px;background:linear-gradient(145deg,var(--violet),#6547d6);display:grid;place-items:center;font-family:'Anton';color:#fff;font-size:11px">${letter}</span>${groupLabel(letter)}`;
         wrap.appendChild(gh);
         gm.forEach(m=>wrap.appendChild(matchCard(m)));
       });
@@ -884,14 +1064,14 @@ function renderMatches(){
       list=list.sort((a,b)=>new Date(a.ts)-new Date(b.ts));
       const isUp=list[0].status==="UP";
       const h=el("div","sect "+(isUp?"up":""));
-      h.innerHTML=`<span class="tick"></span><h2>${STAGE_PLURAL[stage]}</h2><span class="cnt">${list.length}</span><span class="rule"></span>`;
+      h.innerHTML=`<span class="tick"></span><h2>${stageName(stage)}</h2><span class="cnt">${list.length}</span><span class="rule"></span>`;
       wrap.appendChild(h);
       list.forEach(m=>wrap.appendChild(matchCard(m)));
       any=true;
     }
   });
   if(!any){
-    wrap.appendChild(el("div","empty",`<div class="e">🔍</div><p>No matches found${q?` for "${state.q}"`:''}.</p>`));
+    wrap.appendChild(el("div","empty",`<div class="e">🔍</div><p>${t('noMatches')}${q?` ${t('forQ')} "${state.q}"`:''}.</p>`));
   }
   main.appendChild(wrap);
   // wire filters
@@ -906,7 +1086,7 @@ function renderMatches(){
 function bracket(){
   const main=$("#main"); main.innerHTML="";
   const wrap=el("div","view");
-  wrap.appendChild(el("div","brk-intro","The single-elimination path from the last 16 to the July 19 final at MetLife Stadium. Tap a completed tie for its goals."));
+  wrap.appendChild(el("div","brk-intro",t('brkIntro')));
   const r16=M.filter(m=>m.stage==="Round of 16").sort((a,b)=>a.bslot-b.bslot);
   const qf=M.filter(m=>m.stage==="Quarter-final").sort((a,b)=>a.qf-b.qf);
   const sf=M.filter(m=>m.stage==="Semi-final").sort((a,b)=>a.sf-b.sf);
@@ -914,7 +1094,7 @@ function bracket(){
 
   const teamRow=(name,txt,score,win,lose)=>{
     if(name)return `<div class="bx-row ${win?'w':''} ${lose?'l':''}"><span class="fl">${fl(name)}</span><span class="nm">${short(name)}</span><span class="sc">${score!=null?score:''}</span></div>`;
-    return `<div class="bx-row"><span class="tbd">${txt||"TBD"}</span></div>`;
+    return `<div class="bx-row"><span class="tbd">${txt||t('tbd')}</span></div>`;
   };
   const bxFor=(m)=>{
     const done=m.status==="FT";
@@ -923,27 +1103,27 @@ function bracket(){
     const box=el("div","bx"+(done&&(m.goals&&m.goals.length||m.note)?" tap":""));
     box.innerHTML=teamRow(m.home,m.homeTxt,done?m.hs:null,hWin,aWin)+
       `<div class="bx-div"></div>`+teamRow(m.away,m.awayTxt,done?m.as:null,aWin,hWin)+
-      `<div class="bx-meta">${m.pen?`Pens ${m.pen.h}–${m.pen.a} · `:''}${done?fmtDate(m.ts):relDay(m.ts)+' · '+fmtTime(m.ts)}</div>`;
+      `<div class="bx-meta">${m.pen?`${t('pens')} ${m.pen.h}–${m.pen.a} · `:''}${done?fmtDate(m.ts):relDay(m.ts)+' · '+fmtTime(m.ts)}</div>`;
     if(done&&(m.goals&&m.goals.length||m.note))box.addEventListener("click",()=>openSheet(m));
     return box;
   };
 
   const brk=el("div","brk");
   const col=(lab,items,cls)=>{const c=el("div","brk-col "+(cls||""));c.appendChild(el("div","brk-lab",lab));items.forEach(i=>c.appendChild(i));return c;};
-  brk.appendChild(col("Round of 16",r16.map(bxFor),"c-r16"));
-  brk.appendChild(col("Quarter-finals",qf.map(bxFor)));
-  brk.appendChild(col("Semi-finals",sf.map(bxFor)));
+  brk.appendChild(col(stageName('Round of 16'),r16.map(bxFor),"c-r16"));
+  brk.appendChild(col(stageName('Quarter-final'),qf.map(bxFor)));
+  brk.appendChild(col(stageName('Semi-final'),sf.map(bxFor)));
   // final + trophy column
   const finCol=el("div","brk-col");
-  finCol.appendChild(el("div","brk-lab","Final"));
+  finCol.appendChild(el("div","brk-lab",stageName('Final')));
   finCol.appendChild(bxFor(fin));
   const champ=el("div","bx champ");
-  champ.innerHTML=`<div class="trophy">🏆</div><div class="bx-meta" style="color:var(--gold)">Champions · Jul 19</div>`;
+  champ.innerHTML=`<div class="trophy">🏆</div><div class="bx-meta" style="color:var(--gold)">${t('champions1')}</div>`;
   finCol.appendChild(champ);
   brk.appendChild(finCol);
 
   const scroll=el("div","brk-scroll"); scroll.appendChild(brk); wrap.appendChild(scroll);
-  wrap.appendChild(el("div","note-inline",`<span class="i">ℹ️</span><span>Third-place play-off: <b>Sat 18 Jul</b>, Hard Rock Stadium, Miami — Semi-final losers meet for bronze.</span>`));
+  wrap.appendChild(el("div","note-inline",`<span class="i">ℹ️</span><span>${t('thirdNote')}</span>`));
   main.appendChild(wrap);
 }
 
@@ -962,15 +1142,15 @@ function standings(letter){
 function groups(){
   const main=$("#main"); main.innerHTML="";
   const wrap=el("div","view");
-  wrap.appendChild(el("div","note-inline",`<span class="i">✓</span><span>Final group tables. The top two of each group plus the eight best third-placed sides — <b>32 teams</b> — reached the knockouts (highlighted green).</span>`));
+  wrap.appendChild(el("div","note-inline",`<span class="i">✓</span><span>${t('groupsNote')}</span>`));
   const grid=el("div","grp-grid");
   Object.keys(GROUPS).forEach(letter=>{
     const rows=standings(letter);
     const g=el("div","grp");
     g.innerHTML=`
-      <div class="grp-h"><span class="lt">${letter}</span><h3>Group ${letter}</h3></div>
+      <div class="grp-h"><span class="lt">${letter}</span><h3>${groupLabel(letter)}</h3></div>
       <table class="tbl">
-        <thead><tr><th></th><th class="tl2">Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
+        <thead><tr><th></th><th class="tl2">${L().th.team}</th><th>${L().th.p}</th><th>${L().th.w}</th><th>${L().th.d}</th><th>${L().th.l}</th><th>${L().th.gf}</th><th>${L().th.ga}</th><th>${L().th.gd}</th><th>${L().th.pts}</th></tr></thead>
         <tbody>
         ${rows.map((r,i)=>`<tr class="${ADVANCED.has(r.n)?'qual':''}">
           <td class="pos">${i+1}</td>
@@ -980,7 +1160,7 @@ function groups(){
         </tr>`).join("")}
         </tbody>
       </table>
-      <div class="grp-legend"><span class="sw"></span>Advanced to knockout stage</div>`;
+      <div class="grp-legend"><span class="sw"></span>${t('advancedLegend')}</div>`;
     grid.appendChild(g);
   });
   wrap.appendChild(grid);
@@ -994,37 +1174,37 @@ function scorers(){
   const L=BOOT_LEAD;
   wrap.appendChild(el("div","gb-hero",`
     <div class="boot">👟</div>
-    <div class="lab">adidas Golden Boot · Race Leader</div>
+    <div class="lab">${t('bootLeader')}</div>
     <div class="lead">
       <span class="fl">${fl(L.team)}</span>
       <div>
         <div class="nm">${L.name}</div>
-        <div class="meta">${L.team}${L.sh?` · No. ${L.sh}`:''} · all-time World Cup top scorer</div>
+        <div class="meta">${L.team}${L.sh?` · ${t('no')} ${L.sh}`:''} · ${t('allTimeTop')}</div>
       </div>
-      <div class="goals"><div class="g">${L.goals}</div><div class="gl">Goals</div></div>
+      <div class="goals"><div class="g">${L.goals}</div><div class="gl">${t('goalsWord')}</div></div>
     </div>`));
 
   BOOT_TIERS.forEach(tier=>{
-    const t=el("div","tier");
-    t.innerHTML=`<div class="tier-h"><span class="n">${tier.g}</span><span class="t">Goal${tier.g>1?'s':''}</span><span class="rule"></span></div>`;
+    const tt=el("div","tier");
+    tt.innerHTML=`<div class="tier-h"><span class="n">${tier.g}</span><span class="t">${tier.g>1?t('goalPlural'):t('goalSingular')}</span><span class="rule"></span></div>`;
     tier.players.forEach(p=>{
-      t.innerHTML+=`<div class="sc-row">
+      tt.innerHTML+=`<div class="sc-row">
         <span class="fl">${fl(p.team)}</span>
         ${p.sh?`<span class="no">${p.sh}</span>`:''}
         <div class="info"><div class="p">${p.name}</div><div class="c">${p.team}${p.extra?` · ${p.extra}`:''}</div></div>
-        ${p.out?'<span class="out">Eliminated</span>':''}
+        ${p.out?'<span class="out">'+t('eliminated')+'</span>':''}
         <span class="g">${tier.g}</span>
       </div>`;
     });
-    wrap.appendChild(t);
+    wrap.appendChild(tt);
   });
 
   const ones=el("div","tier");
-  ones.innerHTML=`<div class="tier-h"><span class="n">1</span><span class="t">Goal · selected</span><span class="rule"></span></div>`;
+  ones.innerHTML=`<div class="tier-h"><span class="n">1</span><span class="t">${t('goalSelected')}</span><span class="rule"></span></div>`;
   const mini=el("div","sc-mini");
   BOOT_ONES.forEach(p=>mini.innerHTML+=`<span class="m"><span class="fl">${fl(p.team)}</span><span class="p">${p.name}</span><span class="c">${short(p.team)}</span></span>`);
   ones.appendChild(mini);
-  ones.appendChild(el("div","note-inline",`<span class="i">ℹ️</span><span>Many more players have scored once. Tie-breaker for the Golden Boot is assists — Mbappé currently leads that count with two.</span>`));
+  ones.appendChild(el("div","note-inline",`<span class="i">ℹ️</span><span>${t('onesNote')}</span>`));
   wrap.appendChild(ones);
 
   main.appendChild(wrap);
@@ -1044,7 +1224,7 @@ function openSheet(m){
   const need=!up&&m.espnId&&window.wcLoadGoals&&(!m.goals||m.goals.length<total)&&!m._enrichTried;
   if(need){
     m._enrichTried=true;
-    const loader=el("div","tl-loading",`<span class="sp">◌</span> Loading full goal timeline…`);
+    const loader=el("div","tl-loading",`<span class="sp">◌</span> ${t('loadingTimeline')}`);
     $("#sheet").appendChild(loader);
     window.wcLoadGoals(m).then(goals=>{
       if(goals&&goals.length&&goals.length>=(m.goals?m.goals.length:0)) m.goals=goals;
@@ -1058,11 +1238,11 @@ function renderSheetInner(m,hWin,aWin){
   const goals=(m.goals||[]).slice().sort((a,b)=>parseInt(a.m)-parseInt(b.m)||0);
   let tl="";
   if(goals.length){
-    tl=`<div class="tl-h"><span class="tk"></span><h3>Goal Timeline</h3></div><div class="tl">`;
+    tl=`<div class="tl-h"><span class="tk"></span><h3>${t('goalTimeline')}</h3></div><div class="tl">`;
     goals.forEach(g=>{
       const isH=g.t==="h";
       const name=g.p.replace(/ \(own goal\)/,"");
-      const tag=[g.pen?"Penalty":null,g.og?"Own goal":null].filter(Boolean).join(" · ");
+      const tag=[g.pen?t('penalty'):null,g.og?t('ownGoal'):null].filter(Boolean).join(" · ");
       const goal=`<div class="tl-goal ${isH?'':'a'}">
           <span class="bl">${g.og?'🥅':'⚽'}</span>
           <div class="who"><div class="p">${g.sh?`<span class="no">${g.sh}</span>`:''}${name}</div>${tag?`<div class="x">${tag}</div>`:''}</div>
@@ -1073,24 +1253,24 @@ function renderSheetInner(m,hWin,aWin){
     tl+=`</div>`;
   }
   const note=m.note?`<div class="sh-note"><span class="i">✨</span><span>${m.note}</span></div>`:"";
-  const empty=(!up&&!goals.length&&!m.note)?`<div class="sh-empty">Goal-by-goal detail isn't available for this match.</div>`:"";
-  const cal=up?`<button class="calbtn" id="calBtn">📅 Add to Calendar</button>`:"";
+  const empty=(!up&&!goals.length&&!m.note)?`<div class="sh-empty">${t('noDetail')}</div>`:"";
+  const cal=up?`<button class="calbtn" id="calBtn">${t('addCal')}</button>`:"";
   const hn=m.home||m.homeTxt, an=m.away||m.awayTxt;
   const scoreMid=up
-    ?`<div class="sh-mid"><div class="up">VS</div></div>`
-    :`<div class="sh-mid"><div class="big"><span style="${hWin?'color:var(--green)':''}">${m.hs}</span><span class="d"> – </span><span style="${aWin?'color:var(--green)':''}">${m.as}</span></div>${m.pen?`<div class="pn">${m.pen.h}–${m.pen.a} on penalties${m.aet?' · a.e.t.':''}</div>`:''}</div>`;
+    ?`<div class="sh-mid"><div class="up">${t('vs')}</div></div>`
+    :`<div class="sh-mid"><div class="big"><span style="${hWin?'color:var(--green)':''}">${m.hs}</span><span class="d"> – </span><span style="${aWin?'color:var(--green)':''}">${m.as}</span></div>${m.pen?`<div class="pn">${m.pen.h}–${m.pen.a} ${t('onPenalties')}${m.aet?' · '+t('aet'):''}</div>`:''}</div>`;
   $("#sheet").innerHTML=`
     <div class="grab"></div>
-    <div class="sh-stage">${m.group?`Group ${m.group}`:STAGE_PLURAL[m.stage]}${m.status==="LIVE"?" · LIVE "+(m.clock||""):""}</div>
+    <div class="sh-stage">${m.group?`${groupLabel(m.group)}`:stageName(m.stage)}${m.status==="LIVE"?" · "+t('live')+" "+(m.clock||""):""}</div>
     <div class="sh-score">
       <div class="sh-t ${hWin?'win':''}"><span class="fl">${m.home?fl(m.home):"⚔️"}</span><span class="nm">${m.home?short(m.home):hn}</span></div>
       ${scoreMid}
       <div class="sh-t ${aWin?'win':''}"><span class="fl">${m.away?fl(m.away):"⚔️"}</span><span class="nm">${m.away?short(m.away):an}</span></div>
     </div>
     <div class="sh-info">
-      <div class="pv"><div class="k">${up?'Kickoff':'Date'}</div><div class="v">${up?relDay(m.ts)+', '+fmtTime(m.ts)+' AST':fmtDate(m.ts)}</div></div>
-      <div class="pv"><div class="k">Stadium</div><div class="v">${m.venue}</div></div>
-      <div class="pv"><div class="k">City</div><div class="v">${m.city}</div></div>
+      <div class="pv"><div class="k">${up?t('kickoff'):t('date')}</div><div class="v">${up?relDay(m.ts)+', '+fmtTime(m.ts)+' '+t('ast'):fmtDate(m.ts)}</div></div>
+      <div class="pv"><div class="k">${t('stadium')}</div><div class="v">${m.venue}</div></div>
+      <div class="pv"><div class="k">${t('city')}</div><div class="v">${m.city}</div></div>
     </div>
     ${tl}${note}${empty}${cal}`;
   const cb=$("#calBtn"); if(cb)cb.addEventListener("click",()=>addToCalendar(m));
@@ -1111,27 +1291,28 @@ function render(keepScroll){
   if(!keepScroll) window.scrollTo({top:0,behavior:'instant'});
 }
 $("#tabs").querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{state.tab=t.dataset.tab;render();}));
+$("#langBtn").addEventListener("click",()=>setLang(LANG==='ar'?'en':'ar'));
 
 // live status pill
 (function(){
   const up=M.filter(m=>m.status==="UP").sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const next=up.find(m=>new Date(m.ts)>now())||up[0];
-  if(next)$("#statusPill").textContent=STAGE_PLURAL[next.stage];
+  if(next)$("#statusPill").textContent=stageName(next.stage);
 })();
 
 /* ---- Pin your team ---- */
 function renderPinBtn(){
   const b=$("#pinBtn"); if(!b)return;
-  if(FAV){ b.textContent="★"; b.classList.add("set"); b.setAttribute("aria-label","Pinned: "+FAV); }
-  else { b.textContent="☆"; b.classList.remove("set"); b.setAttribute("aria-label","Pin your team"); }
+  if(FAV){ b.textContent="★"; b.classList.add("set"); b.setAttribute("aria-label",t('pinnedLabel')+" "+short(FAV)); }
+  else { b.textContent="☆"; b.classList.remove("set"); b.setAttribute("aria-label",t('pinLabel')); }
 }
 function openFavPicker(){
   const teams=Object.keys(FLAG).sort((a,b)=>short(a).localeCompare(short(b)));
   $("#favSheet").innerHTML=`
     <div class="grab"></div>
-    <div class="fav-h">Pin your team</div>
-    <div class="fav-sub">Starred, sorted to the top, one-tap filter — and its goals get a bigger celebration.</div>
-    ${FAV?`<button class="fav-clear" id="favClear">✕ Unpin ${short(FAV)}</button>`:''}
+    <div class="fav-h">${t('pinTitle')}</div>
+    <div class="fav-sub">${t('pinSub')}</div>
+    ${FAV?`<button class="fav-clear" id="favClear">${t('unpin')} ${short(FAV)}</button>`:''}
     <div class="fav-grid">
       ${teams.map(t=>`<button class="fav-item ${t===FAV?'cur':''}" data-t="${t.replace(/"/g,'&quot;')}"><span class="fl">${fl(t)}</span><span class="nm">${short(t)}</span></button>`).join("")}
     </div>`;
@@ -1155,7 +1336,7 @@ function icsStamp(d){return d.getUTCFullYear()+pad2(d.getUTCMonth()+1)+pad2(d.ge
 function addToCalendar(m){
   const start=new Date(m.ts), end=new Date(start.getTime()+2*3600*1000);
   const hn=m.home||m.homeTxt, an=m.away||m.awayTxt;
-  const title=`${hn} vs ${an} — World Cup ${STAGE_PLURAL[m.stage]}`;
+  const title=`${hn} vs ${an} — World Cup ${stageName(m.stage)}`;
   const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//WC26//EN","BEGIN:VEVENT",
     "UID:wc26-"+m.id+"@ammarshelby","DTSTAMP:"+icsStamp(new Date()),
     "DTSTART:"+icsStamp(start),"DTEND:"+icsStamp(end),
@@ -1172,19 +1353,17 @@ function addToCalendar(m){
 /* ---- Goal celebration ---- */
 let _toastT=null;
 function showGoalToast(m,scorer){
-  const t=$("#goalToast"); if(!t)return;
+  const to=$("#goalToast"); if(!to)return;
   const hn=short(m.home||m.homeTxt||""), an=short(m.away||m.awayTxt||"");
   const fav=isFav(m);
-  t.innerHTML=`<span class="bug">${fav?"🌟":"⚽"}</span><span>GOAL!${fav?" "+short(FAV):""} <span class="gt-s">${fl(m.home)} ${m.hs}–${m.as} ${fl(m.away)}</span>${scorer?" · "+scorer:""}</span>`;
-  t.classList.add("show");
+  to.innerHTML=`<span class="bug">${fav?"🌟":"⚽"}</span><span>${t('goal')}${fav?" "+short(FAV):""} <span class="gt-s">${fl(m.home)} ${m.hs}–${m.as} ${fl(m.away)}</span>${scorer?" · "+scorer:""}</span>`;
+  to.classList.add("show");
   try{ if(navigator.vibrate) navigator.vibrate(fav?[60,40,120]:80); }catch(e){}
   if(_toastT)clearTimeout(_toastT);
-  _toastT=setTimeout(()=>t.classList.remove("show"), 5200);
+  _toastT=setTimeout(()=>to.classList.remove("show"), 5200);
 }
 
-renderPinBtn();
-renderHero();
-render();
+applyLang(true);
 
 /* =====================================================================
    PUSH NOTIFICATIONS (goal alerts)
@@ -1226,29 +1405,29 @@ render();
     let body="", btns="";
 
     if(!supported){
-      body=row("⚠️","This browser doesn't support notifications.","warn");
+      body=row("⚠️",t('pushUnsupported'),"warn");
     } else if(isiOS && !standalone){
-      body=row("📲","On iPhone, alerts only work when the app is opened from your <b>Home Screen icon</b> — not from a Safari tab.","warn")
-         + row("👉","Close this, open the app from its Home Screen icon, then tap 🔔 again.");
+      body=row("📲",t('pushIosA'),"warn")
+         + row("👉",t('pushIosB'));
     } else if(perm==="denied"){
-      body=row("🚫","Notifications are blocked for this app.","warn")
-         + row("🛠","Delete the Home Screen icon, re-add it, then tap 🔔 and choose <b>Allow</b>.");
+      body=row("🚫",t('pushBlocked'),"warn")
+         + row("🛠",t('pushBlockedFix'));
     } else if(sub){
-      body=row("✅","Alerts are switched on for this device.","ok")
+      body=row("✅",t('pushOn1'),"ok")
          + row(CFG.api?"📡":"⏳", CFG.api
-              ? "Connected to the alert server — you'll get a buzz when a goal goes in."
-              : "<b>Almost there.</b> The alert server isn't connected yet (Stage 2). Local test still works.");
-      btns=`<button class="calbtn" id="pushTest">🔔 Send a test notification</button>
-            <button class="fav-clear" id="pushOff" style="margin-top:10px">Turn alerts off</button>`;
+              ? t('pushConnected')
+              : t('pushAlmost'));
+      btns=`<button class="calbtn" id="pushTest">${t('pushTestBtn')}</button>
+            <button class="fav-clear" id="pushOff" style="margin-top:10px">${t('pushOff')}</button>`;
     } else {
-      body=row("⚽","Get a notification the moment a goal goes in — even with the app closed.")
-         + row("⭐","Pinned-team goals get a bigger alert.")
-         + row("🔋","Free, and it won't drain your battery.");
-      btns=`<button class="calbtn" id="pushOn">Enable goal alerts</button>`;
+      body=row("⚽",t('pushSell1'))
+         + row("⭐",t('pushSell2'))
+         + row("🔋",t('pushSell3'));
+      btns=`<button class="calbtn" id="pushOn">${t('pushEnable')}</button>`;
     }
     sheet.innerHTML=`<div class="grab"></div>
-      <div class="fav-h">Goal Alerts</div>
-      <div class="fav-sub">Push notifications for live goals</div>
+      <div class="fav-h">${t('goalAlerts')}</div>
+      <div class="fav-sub">${t('goalAlertsSub')}</div>
       ${body}${btns}`;
     scrim.classList.add("on"); document.body.style.overflow="hidden";
 
@@ -1259,7 +1438,7 @@ render();
   function closePush(){ scrim.classList.remove("on"); document.body.style.overflow=""; }
 
   async function enable(){
-    const b=$("#pushOn"); if(b){b.textContent="Working…"; b.disabled=true;}
+    const b=$("#pushOn"); if(b){b.textContent=t('working'); b.disabled=true;}
     try{
       const perm=await Notification.requestPermission();
       if(perm!=="granted"){ closePush(); setTimeout(openPush,150); return; }
@@ -1278,9 +1457,9 @@ render();
       setBell(true);
       closePush(); setTimeout(openPush,150);
     }catch(e){
-      sheet.innerHTML=`<div class="grab"></div><div class="fav-h">Couldn't enable</div>
+      sheet.innerHTML=`<div class="grab"></div><div class="fav-h">${t('pushFail')}</div>
         <div class="fav-sub">${(e&&e.message)||"Unknown error"}</div>
-        ${row("💡","On iPhone, make sure you opened the app from its <b>Home Screen icon</b>, and that you re-added it after this update.","warn")}`;
+        ${row("💡",t('pushFailTip'),"warn")}`;
     }
   }
   async function disable(){
@@ -1295,7 +1474,7 @@ render();
   async function testNote(){
     try{
       const reg=await navigator.serviceWorker.getRegistration();
-      await reg.showNotification("⚽ GOAL! — test",{body:"If you can see this, alerts are working. 🇲🇦 1–0 🇫🇷",icon:"icon-192.png",badge:"icon-192.png",tag:"wc26-test",renotify:true});
+      await reg.showNotification(t('testTitle'),{body:t('testBody'),icon:"icon-192.png",badge:"icon-192.png",tag:"wc26-test",renotify:true});
       closePush();
     }catch(e){}
   }
@@ -1419,6 +1598,7 @@ render();
     }catch(e){ return null; }
   }
   window.wcLoadGoals=enrichFromSummary;
+  window.__wcSync=syncNow;
   function setSync(cls,txt){
     const b=document.getElementById("syncbar"); if(!b)return;
     b.className="syncbar "+cls;
@@ -1454,19 +1634,19 @@ render();
       }
       firstSync=false;
       renderHero(); render(true);
-      const t=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Riyadh',hour:'numeric',minute:'2-digit'}).format(new Date());
-      if(live>0) setSync("liveok",live+(live>1?" matches":" match")+" live now · auto-updating");
-      else setSync("synced","Live scores connected · updated "+t+" AST");
+      const tm=new Intl.DateTimeFormat(LANG==='ar'?'ar-u-nu-latn':'en-US',{timeZone:'Asia/Riyadh',hour:'numeric',minute:'2-digit'}).format(new Date());
+      if(live>0) setSync("liveok",t('liveMatches',live));
+      else setSync("synced",t('syncConnected',tm)+' '+t('ast'));
       if(liveTimer)clearTimeout(liveTimer);
       liveTimer=setTimeout(syncNow, live>0?45000:180000);
     }catch(e){
-      setSync("offline","Live sync unavailable — showing saved results");
+      setSync("offline",t('syncOffline'));
       if(liveTimer)clearTimeout(liveTimer);
       liveTimer=setTimeout(syncNow,120000);
     }
   }
   const rb=document.getElementById("sbRetry");
-  if(rb)rb.addEventListener("click",()=>{ setSync("checking","Checking live scores…"); syncNow(); });
+  if(rb)rb.addEventListener("click",()=>{ setSync("checking",t('checking')); syncNow(); });
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden)syncNow(); });
   syncNow();
 })();
