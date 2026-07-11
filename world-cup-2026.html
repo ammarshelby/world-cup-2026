@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="World Cup 26">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
+<link rel="manifest" href="manifest.json">
 <title>World Cup 2026 · Live Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -403,6 +404,14 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
 .tl-loading .sp{animation:spin 1s linear infinite;display:inline-block}
 .flag{display:inline-block;height:1em;width:auto;border-radius:2px;vertical-align:-0.14em;
   box-shadow:0 0 0 1px rgba(255,255,255,.1);background:rgba(255,255,255,.05)}
+.pushrow{display:flex;gap:11px;align-items:flex-start;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:11px 13px;margin-bottom:8px;font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.55}
+.pushrow b{color:var(--text);font-weight:800}
+.pushrow .pr-i{font-size:15px;flex:0 0 auto;line-height:1.3}
+.pushrow.ok{background:rgba(31,224,160,.08);border-color:rgba(31,224,160,.26);color:var(--green)}
+.pushrow.ok b{color:var(--green)}
+.pushrow.warn{background:rgba(255,200,71,.08);border-color:rgba(255,200,71,.26);color:#F2E4C2}
+.pushrow.warn b{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -417,6 +426,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
       </div>
     </div>
     <div class="appbar-right">
+      <button class="pinbtn" id="bellBtn" aria-label="Goal alerts">🔔</button>
       <button class="pinbtn" id="pinBtn" aria-label="Pin your team">☆</button>
       <div class="stagepill"><span class="dot"></span><span id="statusPill">Quarter-Finals</span></div>
     </div>
@@ -425,6 +435,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
 
 <div id="goalToast" class="goaltoast"></div>
 <div class="favscrim" id="favScrim"><div class="favsheet" id="favSheet"></div></div>
+<div class="favscrim" id="pushScrim"><div class="favsheet" id="pushSheet"></div></div>
 
 <div class="app">
   <div id="syncbar" class="syncbar checking"><span class="sb-ico">◌</span><span id="syncText">Checking live scores…</span><span class="sb-retry" id="sbRetry">Retry</span></div>
@@ -1174,6 +1185,133 @@ function showGoalToast(m,scorer){
 renderPinBtn();
 renderHero();
 render();
+
+/* =====================================================================
+   PUSH NOTIFICATIONS (goal alerts)
+   Stage 1: registers the service worker, asks permission, creates a
+   subscription. The backend URL lives in push-config.json so it can be
+   filled in later without touching this file.
+   ===================================================================== */
+(function(){
+  const bell=$("#bellBtn"), scrim=$("#pushScrim"), sheet=$("#pushSheet");
+  if(!bell)return;
+  let CFG={publicKey:"",api:""};
+  const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+  const standalone = (window.navigator.standalone===true) ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  function b64ToU8(b64){
+    const pad="=".repeat((4-b64.length%4)%4);
+    const s=(b64+pad).replace(/-/g,"+").replace(/_/g,"/");
+    const raw=atob(s), out=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+    return out;
+  }
+  function setBell(on){ bell.classList.toggle("set",!!on); bell.textContent=on?"🔔":"🔕"; }
+
+  async function loadCfg(){
+    try{ CFG=await (await fetch("push-config.json",{cache:"no-store"})).json(); }catch(e){}
+  }
+  async function currentSub(){
+    try{ const reg=await navigator.serviceWorker.getRegistration(); if(!reg)return null;
+      return await reg.pushManager.getSubscription(); }catch(e){ return null; }
+  }
+  function row(ic,txt,tone){
+    return `<div class="pushrow ${tone||''}"><span class="pr-i">${ic}</span><span>${txt}</span></div>`;
+  }
+  async function openPush(){
+    const perm = supported?Notification.permission:"unsupported";
+    const sub = supported?await currentSub():null;
+    let body="", btns="";
+
+    if(!supported){
+      body=row("⚠️","This browser doesn't support notifications.","warn");
+    } else if(isiOS && !standalone){
+      body=row("📲","On iPhone, alerts only work when the app is opened from your <b>Home Screen icon</b> — not from a Safari tab.","warn")
+         + row("👉","Close this, open the app from its Home Screen icon, then tap 🔔 again.");
+    } else if(perm==="denied"){
+      body=row("🚫","Notifications are blocked for this app.","warn")
+         + row("🛠","Delete the Home Screen icon, re-add it, then tap 🔔 and choose <b>Allow</b>.");
+    } else if(sub){
+      body=row("✅","Alerts are switched on for this device.","ok")
+         + row(CFG.api?"📡":"⏳", CFG.api
+              ? "Connected to the alert server — you'll get a buzz when a goal goes in."
+              : "<b>Almost there.</b> The alert server isn't connected yet (Stage 2). Local test still works.");
+      btns=`<button class="calbtn" id="pushTest">🔔 Send a test notification</button>
+            <button class="fav-clear" id="pushOff" style="margin-top:10px">Turn alerts off</button>`;
+    } else {
+      body=row("⚽","Get a notification the moment a goal goes in — even with the app closed.")
+         + row("⭐","Pinned-team goals get a bigger alert.")
+         + row("🔋","Free, and it won't drain your battery.");
+      btns=`<button class="calbtn" id="pushOn">Enable goal alerts</button>`;
+    }
+    sheet.innerHTML=`<div class="grab"></div>
+      <div class="fav-h">Goal Alerts</div>
+      <div class="fav-sub">Push notifications for live goals</div>
+      ${body}${btns}`;
+    scrim.classList.add("on"); document.body.style.overflow="hidden";
+
+    const on=$("#pushOn"); if(on)on.addEventListener("click",enable);
+    const off=$("#pushOff"); if(off)off.addEventListener("click",disable);
+    const tst=$("#pushTest"); if(tst)tst.addEventListener("click",testNote);
+  }
+  function closePush(){ scrim.classList.remove("on"); document.body.style.overflow=""; }
+
+  async function enable(){
+    const b=$("#pushOn"); if(b){b.textContent="Working…"; b.disabled=true;}
+    try{
+      const perm=await Notification.requestPermission();
+      if(perm!=="granted"){ closePush(); setTimeout(openPush,150); return; }
+      const reg=await navigator.serviceWorker.register("sw.js");
+      await navigator.serviceWorker.ready;
+      if(!CFG.publicKey) throw new Error("no key");
+      const sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:b64ToU8(CFG.publicKey)
+      });
+      if(CFG.api){
+        try{ await fetch(CFG.api+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({subscription:sub, fav:(typeof FAV!=="undefined"?FAV:null)})}); }catch(e){}
+      }
+      try{ localStorage.setItem("wc26_push","1"); }catch(e){}
+      setBell(true);
+      closePush(); setTimeout(openPush,150);
+    }catch(e){
+      sheet.innerHTML=`<div class="grab"></div><div class="fav-h">Couldn't enable</div>
+        <div class="fav-sub">${(e&&e.message)||"Unknown error"}</div>
+        ${row("💡","On iPhone, make sure you opened the app from its <b>Home Screen icon</b>, and that you re-added it after this update.","warn")}`;
+    }
+  }
+  async function disable(){
+    try{ const s=await currentSub(); if(s){
+      if(CFG.api){ try{ await fetch(CFG.api+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({endpoint:s.endpoint})}); }catch(e){} }
+      await s.unsubscribe();
+    } }catch(e){}
+    try{ localStorage.removeItem("wc26_push"); }catch(e){}
+    setBell(false); closePush(); setTimeout(openPush,150);
+  }
+  async function testNote(){
+    try{
+      const reg=await navigator.serviceWorker.getRegistration();
+      await reg.showNotification("⚽ GOAL! — test",{body:"If you can see this, alerts are working. 🇲🇦 1–0 🇫🇷",icon:"icon-192.png",badge:"icon-192.png",tag:"wc26-test",renotify:true});
+      closePush();
+    }catch(e){}
+  }
+
+  bell.addEventListener("click",openPush);
+  scrim.addEventListener("click",e=>{ if(e.target===scrim)closePush(); });
+
+  (async function init(){
+    await loadCfg();
+    if(!supported){ setBell(false); return; }
+    if(Notification.permission==="granted"){
+      try{ await navigator.serviceWorker.register("sw.js"); }catch(e){}
+      setBell(!!(await currentSub()));
+    } else setBell(false);
+  })();
+})();
 
 /* =====================================================================
    LIVE SYNC — pulls real scores from ESPN's public World Cup feed.

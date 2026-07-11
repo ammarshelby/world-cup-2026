@@ -1,0 +1,16 @@
+{
+  "name": "World Cup 2026 · Live Tracker",
+  "short_name": "World Cup 26",
+  "description": "Live World Cup 2026 scores, bracket, groups, scorers and goal alerts.",
+  "start_url": "world-cup-2026.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06080F",
+  "theme_color": "#06080F",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
